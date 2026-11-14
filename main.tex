@@ -1,1 +1,92 @@
+\documentclass[12pt,a4paper]{article}
 
+% Paquetes esenciales
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage[margin=2.54cm]{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs} 
+\usepackage{csquotes} 
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+
+\usepackage[backend=biber, style=ieee]{biblatex}
+\addbibresource{referencias.bib}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+    {\Large \textbf{Universidad Técnica Estatal de Quevedo (UTEQ)}}\\[0.5cm]
+    {\large Facultad de Ciencias de la Ingeniería}\\[0.5cm]
+    {\large Carrera de Ingeniería de Software}\\[2cm]
+    
+    {\large \textbf{Asignatura:} Sistemas Distribuidos}\\[0.5cm]
+    {\large \textbf{Código de la Actividad:} TA-IND-01}\\[1.5cm]
+    
+    {\Large \textbf{Análisis crítico de InfluxDB y comparación arquitectónica con Prometheus}}\\[2cm]
+    
+    {\large \textbf{Estudiante:} Cesar Abrahan Macias Vasquez}\\[0.5cm]
+    {\large \textbf{Paralelo:} 7mo B}\\[0.5cm]
+    {\large \textbf{Fecha:} 15 de noviembre de 2026}\\[1cm]
+    
+    {\large \textbf{URL del Repositorio:} \url{https://github.com/CesarMacias007/TA-IND-01-Informe-Acad-mico-Individual-An-lisis-Cr-tico-de-Sistemas-Distribuidos.git}}
+    
+    \vfill
+\end{titlepage}
+
+
+\begin{abstract}
+% Espacio para el resumen de 150 a 200 palabras (lo haremos al final).
+\end{abstract}
+
+
+\section{Introducción}
+El auge de la Internet de las Cosas (IoT) y la monitorización de infraestructura ha impulsado la necesidad de sistemas distribuidos capaces de ingerir y consultar volúmenes masivos de datos temporales con baja latencia \cite{kopp2025}. InfluxDB se presenta como una base de datos de series temporales (TSDB) de alto rendimiento diseñada específicamente para este propósito \cite{bader2021}. A diferencia de las bases de datos relacionales o de documentos tradicionales, InfluxDB optimiza el almacenamiento continuo de métricas estructuradas en el tiempo, siendo ampliamente utilizada en entornos de observabilidad a gran escala \cite{tripathi2023}. 
+
+Se eligió analizar InfluxDB debido a su arquitectura distribuida híbrida, la cual resuelve los desafíos de particionamiento de red y consistencia de manera distinta a otros sistemas del mercado, como Prometheus. El objetivo de este informe es evaluar críticamente cómo InfluxDB implementa las transparencias de distribución, su comportamiento frente al teorema CAP y su modelo de comunicación orientado a eventos.
+
+\section{Arquitectura del Sistema}
+La arquitectura distribuida de InfluxDB (en su versión Enterprise o clúster) separa lógicamente el procesamiento de ingesta, el almacenamiento de datos y la gestión de metadatos para lograr escalabilidad horizontal \cite{ford2021}. Sus componentes principales son:
+
+\begin{itemize}
+    \item \textbf{API HTTP (Ingesta y Consulta):} Actúa como la puerta de enlace para los clientes, recibiendo datos a través de peticiones asincrónicas en un formato optimizado llamado \textit{Line Protocol}.
+    \item \textbf{Nodos de Datos (Data Nodes):} Responsables del almacenamiento físico de las series temporales. Utilizan un motor de almacenamiento propio llamado TSM (\textit{Time-Structured Merge Tree}) respaldado por un WAL (\textit{Write-Ahead Log}) para garantizar la durabilidad \cite{silva2023}.
+    \item \textbf{Nodos Meta (Meta Nodes):} Mantienen el estado global del clúster, gestionando la topología, la ubicación de los \textit{shards} (fragmentos de datos) y la autenticación. 
+\end{itemize}
+
+Ambos tipos de nodos se comunican de forma asincrónica, permitiendo que el sistema mantenga la ingesta de datos incluso si algunos nodos de almacenamiento presentan latencia o fallos temporales.
+
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width=0.8\textwidth]{arquitectura.png}
+    \caption{Arquitectura distribuida de InfluxDB.}
+    \label{fig:arquitectura}
+\end{figure}
+
+\section{Análisis con los Conceptos de la Unidad 1}
+
+\subsection{Transparencias de Distribución}
+InfluxDB logra abstraer la complejidad de su clúster para los desarrolladores a través de múltiples transparencias de distribución:
+\begin{itemize}
+    \item \textbf{Transparencia de Ubicación y Acceso:} Los clientes interactúan exclusivamente con una única API HTTP RESTful. El usuario envía una métrica sin necesidad de conocer en qué nodo físico o \textit{shard} del clúster se almacenará finalmente el dato.
+    \item \textbf{Transparencia de Replicación:} El sistema permite configurar un factor de replicación (ej. $N=3$). El usuario escribe el dato una sola vez, y el sistema se encarga de propagarlo a los nodos correspondientes de forma invisible \cite{silva2023}.
+    \item \textbf{Transparencia de Fallos (Parcial):} Si un nodo de datos cae, las consultas se enrutan automáticamente a las réplicas disponibles. Sin embargo, no es completamente transparente en escenarios de consistencia estricta, ya que las lecturas pueden retornar datos desactualizados (consistencia eventual).
+\end{itemize}
+
+\subsection{Teorema CAP y PACELC}
+InfluxDB adopta un enfoque híbrido frente al teorema CAP, separando el tratamiento de los metadatos y los datos de series temporales \cite{tripathi2023}:
+\begin{itemize}
+    \item \textbf{Metadatos (CP - Consistencia y Tolerancia a Particiones):} Para la gestión de la topología del clúster, los Nodos Meta utilizan el algoritmo de consenso Raft. Ante una partición de red, si no hay un cuórum mayoritario, el clúster rechaza cambios en su estructura para mantener la consistencia estricta \cite{blinowski2022}.
+    \item \textbf{Datos (AP - Disponibilidad y Tolerancia a Particiones):} Para la ingesta de métricas, InfluxDB prioriza la disponibilidad. Si un nodo de datos destino está inaccesible debido a una partición, el nodo receptor almacena temporalmente los datos en una cola llamada \textit{Hinted Handoff}. Una vez que el nodo caído se recupera, los datos se sincronizan.
+\end{itemize}
+Bajo la extensión PACELC, en ausencia de particiones (E), el sistema prioriza la latencia (L) sobre la consistencia (C), respondiendo a los clientes tan pronto como el dato es escrito en la memoria y en el WAL, antes de que se replique por completo.
+
+
+\printbibliography[heading=bibintoc, title={Referencias}]
+
+\end{document}
