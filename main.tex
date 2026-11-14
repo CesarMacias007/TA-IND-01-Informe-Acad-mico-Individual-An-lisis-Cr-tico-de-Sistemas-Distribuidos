@@ -11,7 +11,7 @@
 \usepackage{xcolor}
 \usepackage[hidelinks]{hyperref}
 
-
+% Configuración de referencias IEEE con biblatex
 \usepackage[backend=biber, style=ieee]{biblatex}
 \addbibresource{referencias.bib}
 
@@ -39,11 +39,9 @@
     \vfill
 \end{titlepage}
 
-
 \begin{abstract}
-% Espacio para el resumen de 150 a 200 palabras (lo haremos al final).
+Este informe presenta un análisis crítico de la arquitectura distribuida de InfluxDB, una base de datos especializada en series temporales (TSDB), contrastándola con el modelo operativo de Prometheus. A través de los conceptos fundamentales de sistemas distribuidos, se evalúa cómo InfluxDB implementa las transparencias de ubicación y replicación mediante su API unificada, y cómo resuelve las disyuntivas del teorema CAP priorizando la consistencia (CP) en su metadata mediante el algoritmo Raft, pero favoreciendo la disponibilidad (AP) en la ingesta de datos a través de mecanismos como \textit{Hinted Handoff}. El estudio detalla las implicaciones del modelo de comunicación asincrónico \textit{Push} frente al \textit{Pull}, la tolerancia a fallos ante eventos reales como la degradación por explosión de cardinalidad, y presenta un escenario de experimentación propia mediante despliegue en contenedores. Finalmente, se argumentan las fortalezas y limitaciones del sistema, contextualizando sus compromisos arquitectónicos con ejemplos del entorno cotidiano local e informático.
 \end{abstract}
-
 
 \section{Introducción}
 El auge de la Internet de las Cosas (IoT) y la monitorización de infraestructura ha impulsado la necesidad de sistemas distribuidos capaces de ingerir y consultar volúmenes masivos de datos temporales con baja latencia \cite{kopp2025}. InfluxDB se presenta como una base de datos de series temporales (TSDB) de alto rendimiento diseñada específicamente para este propósito \cite{bader2021}. A diferencia de las bases de datos relacionales o de documentos tradicionales, InfluxDB optimiza el almacenamiento continuo de métricas estructuradas en el tiempo, siendo ampliamente utilizada en entornos de observabilidad a gran escala \cite{tripathi2023}. 
@@ -63,7 +61,7 @@ Ambos tipos de nodos se comunican de forma asincrónica, permitiendo que el sist
 
 \begin{figure}[H]
     \centering
-    % \includegraphics[width=0.8\textwidth]{arquitectura.png}
+    % \includegraphics[width=0.8\textwidth]{arquitectura.jpeg}
     \caption{Arquitectura distribuida de InfluxDB.}
     \label{fig:arquitectura}
 \end{figure}
@@ -86,7 +84,75 @@ InfluxDB adopta un enfoque híbrido frente al teorema CAP, separando el tratamie
 \end{itemize}
 Bajo la extensión PACELC, en ausencia de particiones (E), el sistema prioriza la latencia (L) sobre la consistencia (C), respondiendo a los clientes tan pronto como el dato es escrito en la memoria y en el WAL, antes de que se replique por completo.
 
+\subsection{Modelos de Comunicación}
+A diferencia de los sistemas de monitorización basados en el modelo \textit{Pull} (donde el servidor interroga periódicamente a los clientes), InfluxDB implementa un modelo \textit{Push}. Los agentes emisores inician la comunicación enviando datos activamente hacia la API HTTP mediante peticiones \texttt{POST}. Este enfoque asincrónico por lotes (\textit{batching}) reduce la sobrecarga de conexiones persistentes y aísla al clúster, ya que este no necesita conocer previamente las direcciones IP o la topología de los dispositivos IoT que le reportan \cite{bader2021}.
+
+\subsection{Tolerancia a Fallos e Incidentes en Producción}
+El diseño de InfluxDB absorbe fallos transitorios utilizando el mecanismo de \textit{Hinted Handoff} previamente descrito. Las caídas abruptas de energía se mitigan con el registro continuo en el WAL (\textit{Write-Ahead Log}), lo que permite al motor TSM reconstruir el estado en memoria al reiniciar.
+
+No obstante, el sistema presenta vulnerabilidades documentadas frente al agotamiento de recursos. Dado que InfluxDB prioriza aceptar el tráfico de ingesta continuo por sobre las tareas internas de compactación de disco, un incidente recurrente en instancias masivas es la terminación abrupta por falta de memoria (OOM - \textit{Out Of Memory}) %
+ derivado de una explosión de cardinalidad (indexar erróneamente valores infinitos como UUIDs en las etiquetas) \cite{githubOOM}. %
+ Asimismo, ocurren bloqueos a gran escala, como el incidente documentado en septiembre de 2026 en InfluxDB Cloud (región Azure West Europe), donde una prolongada degradación de consultas provocó tiempos de espera críticos, obligando a duplicar la memoria base para el \textit{page cache} y el rendimiento de disco de los nodos para estabilizar la plataforma \cite{pulsapi2026}. %
+
+\section{Experimentación Propia}
+Para evidenciar empíricamente los límites de disponibilidad ante particiones (AP del teorema CAP) en sistemas de nodo único y comprobar el modelo \textit{Push}, se desplegó InfluxDB 1.8 en contenedores Docker mediante GitHub Codespaces (ver Anexo B). 
+
+Durante la prueba, se simuló a un cliente enviando métricas asincrónicas de temperatura mediante \texttt{cURL} hacia la API HTTP. Posteriormente, se forzó la caída del clúster deteniendo el contenedor. Al intentar enviar una nueva métrica durante la interrupción, el servidor retornó inmediatamente un rechazo de red (\textit{Connection refused}). Esto corroboró que, al carecer de una capa de réplicas que gestione el \textit{Hinted Handoff}, la responsabilidad de encolar y reintentar el envío recae completamente sobre el agente productor.
+
+\section{Ejemplos del Entorno del Estudiante}
+Las disyuntivas arquitectónicas de los sistemas distribuidos son perceptibles en aplicaciones cotidianas:
+\begin{itemize}
+    \item \textbf{SGA de la UTEQ (Disponibilidad frente a Consistencia):} Durante la temporada masiva de matriculación, la infraestructura prioriza mantenerse en línea para despachar las páginas web (Disponibilidad). Esto genera un modelo de consistencia eventual; un estudiante puede visualizar un paralelo con cupos disponibles en su caché local y, segundos después, al intentar registrarse, el servidor rechaza la transacción porque el estado central ya cambió.
+    \item \textbf{Multijugador GTA Online (Modelos Híbridos):} El juego aplica dos estrategias de red distintas. Para el movimiento en el mundo abierto, utiliza sincronización casi \textit{Peer-to-Peer} (P2P), minimizando la latencia. Sin embargo, para eventos críticos, como alterar el dinero en la cuenta bancaria del personaje, cambia a un modelo Cliente-Servidor estricto, priorizando la consistencia fuerte para evitar transacciones no autorizadas.
+\end{itemize}
+
+\section{Análisis Comparativo: InfluxDB vs Prometheus}
+\begin{table}[H]
+    \centering
+    \caption{Comparativa arquitectónica de Bases de Datos de Series Temporales}
+    \begin{tabular}{@{}p{3.5cm} p{5.5cm} p{5.5cm}@{}}
+        \toprule
+        \textbf{Criterio (Unidad 1)} & \textbf{InfluxDB} & \textbf{Prometheus} \\ \midrule
+        \textbf{Comunicación} & Push (HTTP POST activo) & Pull (Scraping periódico HTTP GET) \\
+        \textbf{Teorema CAP} & Prioriza AP (Hinted Handoff) & Prioriza CP local / Alta Disponibilidad vía pares \\
+        \textbf{Ubicación}& Transparencia alta (API única)& Transparencia baja (Requiere Service Discovery)\\
+        \textbf{Redundancia} & Nativa (Raft y fragmentación) & Réplicas independientes sin clúster nativo \\
+        \textbf{Casos Ideales} & Eventos irregulares (IoT) y logs & Topologías dinámicas efímeras (Kubernetes) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+La disparidad principal radica en la iniciativa de la comunicación. Prometheus domina ecosistemas de microservicios nativos de la nube porque su modelo \textit{Pull} descubre dinámicamente si un contenedor muere, dejando de recolectar basura automáticamente. Por el contrario, InfluxDB es estructuralmente superior cuando se requiere registrar latencias de eventos impredecibles y cuando los clientes de origen (como sensores en fincas) se encuentran detrás de firewalls y NAT estáticos, obligando al sistema a recibir datos (\textit{Push}) en lugar de ir a buscarlos.
+
+\section{Postura Crítica}
+La especialización del motor TSM de InfluxDB permite ingerir cientos de miles de eventos por segundo, pero su arquitectura introduce compromisos severos. Al depender del cliente para iniciar el modelo \textit{Push}, InfluxDB es vulnerable a ataques de denegación por flujo descontrolado, requiriendo robustas colas externas (como Kafka) en entornos masivos. Adicionalmente, el ecosistema penaliza dramáticamente el mal diseño de esquemas: si un desarrollador indexa datos infinitos en las etiquetas (como hashes de sesión), se genera una sobrecarga térmica en la memoria del sistema operativo. Por tanto, en arquitecturas donde los datos requieren vínculos relacionales fuertes o estricto cumplimiento ACID para transacciones comerciales, bases tradicionales distribuidas como CockroachDB serían una opción operativa mucho más estable.
+
+\section{Conclusiones}
+\begin{itemize}
+    \item La separación algorítmica entre la gestión del clúster mediante Raft (CP) y el almacenamiento físico (AP) permite a InfluxDB soportar ráfagas agresivas de ingesta sin corromper la consistencia de su topología.
+    \item La experimentación en un entorno aislado ratificó que el modelo \textit{Push} por HTTP facilita la escalabilidad y transparencia de acceso a costa de delegar la recuperación de fallas de red al productor del dato.
+    \item Todos los sistemas distribuidos evaluados exigen ceder consistencia inmediata para ganar tolerancia a las particiones de red (PACELC), un sacrificio perfectamente asimilable en métricas de observabilidad.
+\end{itemize}
+
+\section{Declaración de Uso de Inteligencia Artificial}
+Para la elaboración de este informe se utilizó la inteligencia artificial Gemini como herramienta de apoyo en la estructuración de sintaxis LaTeX, integración bibliográfica y en el mapeo de detalles técnicos sobre incidentes comprobables. El diseño lógico de la arquitectura, el análisis comparativo, el proceso de experimentación en contenedores y el razonamiento conceptual frente a los sistemas del entorno cotidiano fueron analizados, validados y concluidos de manera totalmente autónoma.
+
+\newpage
+\appendix
+\section{Anexo A: Evolución de la Arquitectura}
+\begin{figure}[H]
+    \centering
+    % Descomenta y asegúrate de tener la imagen subida
+    % \includegraphics[width=0.7\textwidth]{esquema.jpeg}
+    \caption{Bosquejo inicial a mano de los componentes del sistema.}
+\end{figure}
+
+\section{Anexo B: Evidencia de Lectura de Fuentes y Experimentación}
+\begin{figure}[H]
+    \centering
+    % \includegraphics[width=0.7\textwidth]{capturas_fuentes_1.jpg}
+    \caption{Evidencia fotográfica del proceso de documentación técnica e interacción local con la base de datos.}
+\end{figure}
 
 \printbibliography[heading=bibintoc, title={Referencias}]
-
 \end{document}
