@@ -1,1 +1,17 @@
+Experimento TA-IND-01: InfluxDB (Modelo Push y Caída de Nodo)
+Estudiante: Cesar Macias (@CesarMacias007)
 
+1. Levantar contenedor InfluxDB 1.8 (Transparencia de Ubicación):
+docker run -d -p 8086:8086 --name influx_test influxdb:1.8
+docker ps
+
+2. Crear base de datos "mydb" y enviar métrica vía modelo PUSH (API HTTP):
+curl -i -XPOST 'http://localhost:8086/query' --data-urlencode "q=CREATE DATABASE mydb"
+curl -i -XPOST 'http://localhost:8086/write?db=mydb' --data-binary 'sensor,ubicacion=laboratorio temperatura=25.4'
+
+3. Provocar caída del nodo para evaluar tolerancia a fallos:
+docker stop influx_test
+
+4. Comprobar partición de red (indisponibilidad) y registrar fecha:
+curl -i -XPOST 'http://localhost:8086/write?db=mydb' --data-binary 'sensor,ubicacion=laboratorio temperatura=26.0'
+date
