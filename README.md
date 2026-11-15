@@ -11,7 +11,7 @@ Este repositorio contiene el informe académico individual y las evidencias expe
 ##  Video de Sustentación
 Puedes revisar la explicación de la arquitectura y la demostración del experimento de caída de nodo en el siguiente enlace:
 
- **el video se esta elaborando**
+ **[Aqui el video](https://www.youtube.com/watch?v=2LL-hXH2_zk)**
 
 ---
 
