@@ -62,9 +62,9 @@ El almacenamiento físico delega las operaciones a una jerarquía de componentes
     \item \textbf{TSI (Time Series Index):} Un índice invertido que mueve la cardinalidad masiva (millones de etiquetas únicas) de la memoria RAM al disco, previniendo el agotamiento de recursos (\textit{OOM - Out of Memory}) al consultar topologías complejas.
 \end{itemize}
 
-\begin{figure}[H]
+\begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{arquitectura.jpeg}
+    \includegraphics[width=0.7\textwidth]{arquitectura.jpeg}
     \caption{Arquitectura distribuida de InfluxDB.}
     \label{fig:arquitectura}
 \end{figure}
@@ -109,7 +109,7 @@ Prometheus representa la filosofía antagonista: el modelo \textit{Pull}.
 \subsection{El Motor de Prometheus (mmap vs TSM)}
 Prometheus está diseñado para raspar (\textit{scrape}) endpoints HTTP periódicamente. Utiliza integración profunda con orquestadores a través de su \textit{Service Discovery} dinámico \cite{ford2021}. Físicamente, no usa árboles TSM. Prometheus guarda bloques de dos horas y los mapea directamente a memoria virtual usando \texttt{mmap} del Kernel de Linux. Esto es ultra-rápido para consultas analíticas recientes (PromQL), pero terrible para almacenamiento histórico masivo o retención de años.
 
-\begin{table}[H]
+\begin{table}[htbp]
     \centering
     \caption{Disección Técnica TSDB: InfluxDB vs. Prometheus}
     \begin{tabular}{@{}p{3.8cm} p{5.5cm} p{5.5cm}@{}}
@@ -135,25 +135,27 @@ Prometheus evita la sobresaturación, pues él mismo dictamina la velocidad de i
 \section{Declaración de Uso de Inteligencia Artificial}
 Para la elaboración de este informe se utilizó la inteligencia artificial Gemini como asistencia en la sintaxis LaTeX, integración bibliográfica y profundización en el análisis de topologías LSM/TSM. El proceso lógico comparativo, diseño estructural y la simulación experimental mediante contenedores efímeros fueron desarrollados integralmente por el autor.
 
-\newpage
+\clearpage
 \appendix
 \section{Anexo A: Evolución de la Arquitectura}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.7\textwidth]{esquema.jpeg}
+    \includegraphics[width=0.65\textwidth]{esquema.jpeg}
     \caption{Bosquejo inicial a mano del flujo arquitectónico y almacenamiento subyacente.}
 \end{figure}
 
+\clearpage
 \section{Anexo B: Evidencia de Lectura de Fuentes Académicas}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.75\textwidth]{captura_fuentes_1.png}
-    \vspace{0.5cm}
+    \includegraphics[width=0.65\textwidth]{captura_fuentes_1.png}
+    \vspace{0.3cm}
     
-    \includegraphics[width=0.75\textwidth]{captura_fuentes_3.png}
+    \includegraphics[width=0.65\textwidth]{captura_fuentes_3.png}
     \caption{Constancia de análisis heurístico de bases de datos TSDB (Kopp et al., 2025; ntop, 2023).}
 \end{figure}
 
+\clearpage
 \section{Anexo C: Evidencia de Experimentación en Nube (Codespaces)}
 \begin{figure}[H]
     \centering
@@ -172,6 +174,7 @@ Para la elaboración de este informe se utilizó la inteligencia artificial Gemi
     \caption{Interrupción de disponibilidad de nodo y rechazo de red inmediato en ausencia de réplicas.}
 \end{figure}
 
+\clearpage
 \printbibliography[heading=bibintoc, title={Referencias Bibliográficas Analizadas}]
 
 \end{document}
