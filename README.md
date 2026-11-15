@@ -1,16 +1,31 @@
-# TA-IND-01: Análisis Crítico de un Sistema Distribuido (InfluxDB)
+# TA-IND-01: Análisis Crítico de InfluxDB vs Prometheus
 
-Este repositorio contiene el informe académico individual sobre la arquitectura distribuida de InfluxDB, contrastada con Prometheus.
+**Universidad Técnica Estatal de Quevedo (UTEQ)**  
+**Asignatura:** Sistemas Distribuidos  
+**Estudiante:** Cesar Abrahan Macias Vasquez (@CesarMacias007)  
 
-## Enlace al Video de Sustentación
+Este repositorio contiene el informe académico individual y las evidencias experimentales sobre la arquitectura distribuida de InfluxDB, su modelo de comunicación *Push*, su comportamiento frente al Teorema CAP (y PACELC), y una comparación técnica de bajo nivel con Prometheus.
 
+---
 
-## Instrucciones de Compilación (LaTeX)
-Para compilar este documento y regenerar el PDF correctamente con sus referencias IEEE, se debe ejecutar la siguiente secuencia de comandos en la raíz del proyecto:
+##  Video de Sustentación
+Puedes revisar la explicación de la arquitectura y la demostración del experimento de caída de nodo en el siguiente enlace:
 
-1. `pdflatex main.tex`
-2. `biber main`
-3. `pdflatex main.tex`
-4. `pdflatex main.tex`
+ **el video se esta elaborando**
 
-**Dependencias:** El documento requiere los paquetes `biblatex` (con backend `biber`), `babel` (spanish), `geometry`, `graphicx`, `float`, `booktabs`, `csquotes` y `hyperref`.
+---
+
+##  Contenido del Repositorio
+- `main.tex` y `referencias.bib`: Código fuente en LaTeX del informe y su bibliografía IEEE.
+- `BITACORA.md`: Registro detallado de las actividades realizadas durante los días de trabajo.
+- `comandos_experimento.txt`: Registro del despliegue efímero en Docker y pruebas HTTP (*cURL*) realizadas en Codespaces.
+- `*.png / *.jpeg`: Evidencias visuales de la arquitectura, fuentes académicas leídas (Anexo B) y capturas de la terminal (Anexo C).
+
+##  Instrucciones de Compilación (LaTeX)
+Para compilar este documento y regenerar el PDF correctamente con sus referencias IEEE, se debe ejecutar la siguiente secuencia de comandos en la terminal (recomendado usar GitHub Codespaces o Overleaf):
+
+```bash
+pdflatex main.tex
+biber main
+pdflatex main.tex
+pdflatex main.tex
